@@ -1,0 +1,15 @@
+version: '3'
+services:
+  sqlserver:
+    build:
+     context: .
+    environment:
+      ACCEPT_EULA: Y
+      SA_PASSWORD: Slava_IU_lab_ps
+    volumes:
+      - ./labvolume/data:/var/opt/mssql/data
+    ports:
+      - "1433:1433"
+
+#  cd DataGripProjects/iu_database/lab5
+# запуск: docker-compose up -d
