@@ -148,12 +148,19 @@ ON CombinedView
 INSTEAD OF INSERT
 AS
 BEGIN
-    INSERT INTO Location (Address, Name, Description)
-    SELECT Address, LocationName, LocationDescription FROM inserted;
+    INSERT INTO Location (LocationId, Address, Name, Description)
+    SELECT LocationId, Address, LocationName, LocationDescription FROM inserted;
 
-    INSERT INTO Meeting (MeetingDate, Location, Agreement, FirstRatingStats, SecondRatingStats)
-    SELECT MeetingDate, LocationId, Agreement, FirstRatingStats, SecondRatingStats FROM inserted;
+    INSERT INTO Meeting (meetingId, MeetingDate, Location, Agreement, FirstRatingStats, SecondRatingStats)
+    SELECT NEWID(), MeetingDate, LocationId, Agreement, FirstRatingStats, SecondRatingStats FROM inserted;
 END;
+
+DROP TRIGGER IF EXISTS trg_CombinedView_Insert;
+
+INSERT INTO CombinedView (LocationId, Address, LocationName, LocationDescription, MeetingDate, Agreement, FirstRatingStats, SecondRatingStats)
+VALUES
+(NEWID(), '123 Main St', 'Conference Room A', 'Modern meeting space with audiovisual equipment', '2023-02-15', 1, 95, 88),
+(NEWID(), '456 Oak St', 'Board Room B', 'Classic board room for executive meetings', '2023-02-20', 1, 90, 85);
 
 -- Обновление
 CREATE TRIGGER trg_CombinedView_Update
@@ -178,12 +185,25 @@ BEGIN
     INNER JOIN inserted i ON M.MeetingId = i.MeetingId;
 END;
 
+DROP TRIGGER IF EXISTS trg_CombinedView_Update;
+
+UPDATE CombinedView
+SET LocationName = 'Updated Location', LocationDescription = 'Updated Description'
+WHERE LocationId = '1B831EC9-C3C2-4DF9-A0B1-3A9085CC9366';
+
+
 -- Удаление
 CREATE TRIGGER trg_CombinedView_Delete
 ON CombinedView
 INSTEAD OF DELETE
 AS
 BEGIN
-    DELETE FROM Location WHERE LocationId IN (SELECT LocationId FROM deleted);
     DELETE FROM Meeting WHERE Location IN (SELECT LocationId FROM deleted);
+    DELETE FROM Location WHERE LocationId IN (SELECT LocationId FROM deleted);
 END;
+
+DROP TRIGGER IF EXISTS trg_CombinedView_Delete;
+
+DELETE FROM CombinedView
+WHERE LocationId = '1B831EC9-C3C2-4DF9-A0B1-3A9085CC9366';
+
