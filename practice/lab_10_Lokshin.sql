@@ -1,4 +1,3 @@
--- Хорошо написанную теорию нашел на https://backendinterview.ru/db/dBTheory/transactions.html
 -- Из предыдущих лаб любимая таблица Location
 
 CREATE TABLE Location (
