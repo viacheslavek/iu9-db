@@ -102,43 +102,71 @@ WHERE Address = '456 Oak St';
 -- 2. Для представления пункта 2 задания 7 создать триггеры на вставку, удаление и обновление,
 -- обеспечивающие возможность выполнения операций с данными непосредственно через представление.
 
+CREATE TABLE Location (
+    LocationId INT PRIMARY KEY,
+    Address NVARCHAR(256),
+    Name NVARCHAR(256),
+    Description NVARCHAR(1024),
+);
+
+INSERT INTO Location (LocationId, Address, Name, Description)
+VALUES (1, '123 Main St', 'Sample Location', 'This is a sample location');
+INSERT INTO Location (LocationId, Address, Name, Description)
+VALUES (2, '456 Oak St', 'Another Location', 'This is another location');
+INSERT INTO Location (LocationId, Address, Name, Description)
+VALUES (3, '789 Pine St', 'Yet Another Location', 'This is yet another location');
+
+DROP TABLE IF EXISTS Location;
+
 CREATE TABLE Meeting (
-    meetingId UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+    MeetingId INT PRIMARY KEY,
     MeetingDate DATE,
-    Location UNIQUEIDENTIFIER FOREIGN KEY REFERENCES Location(LocationId),
+    LocationId INT FOREIGN KEY REFERENCES Location(LocationId),
     Agreement BIT,
     FirstRatingStats SMALLINT,
     SecondRatingStats SMALLINT
 );
 
-INSERT INTO Meeting (MeetingDate, Location, Agreement, FirstRatingStats, SecondRatingStats)
-VALUES ('2023-11-15', '1B831EC9-C3C2-4DF9-A0B1-3A9085CC9366', 1, 5, 4);
-INSERT INTO Meeting (MeetingDate, Location, Agreement, FirstRatingStats, SecondRatingStats)
-VALUES ('2023-11-16', 'AD73AD01-17F6-4A88-ADAC-7005DC1419FC', 0, 3, 5);
-INSERT INTO Meeting (MeetingDate, Location, Agreement, FirstRatingStats, SecondRatingStats)
-VALUES ('2023-11-17', '1AA3E0E1-B7A7-4BB8-A578-7D7B16E5D2E8', 1, 4, 4);
+INSERT INTO Meeting (MeetingId, MeetingDate, LocationId, Agreement, FirstRatingStats, SecondRatingStats)
+VALUES (1, '2023-11-15', 1, 1, 5, 4);
+INSERT INTO Meeting (MeetingId, MeetingDate, LocationId, Agreement, FirstRatingStats, SecondRatingStats)
+VALUES (2, '2023-11-16', 2, 0, 3, 5);
+INSERT INTO Meeting (MeetingId, MeetingDate, LocationId, Agreement, FirstRatingStats, SecondRatingStats)
+VALUES (3, '2023-11-17', 3, 1, 4, 4);
+INSERT INTO Meeting (MeetingId, MeetingDate, LocationId, Agreement, FirstRatingStats, SecondRatingStats)
+VALUES (4, '2023-11-14', 1, 1, 5, 4);
+INSERT INTO Meeting (MeetingId, MeetingDate, LocationId, Agreement, FirstRatingStats, SecondRatingStats)
+VALUES (5, '2023-11-19', 2, 0, 2, 5);
+INSERT INTO Meeting (MeetingId, MeetingDate, LocationId, Agreement, FirstRatingStats, SecondRatingStats)
+VALUES (6, '2024-11-17', 3, 1, 5, 4);
 
 
 DROP TABLE IF EXISTS Meeting;
 
 -- Создание представления на основе полей связанных таблиц
+-- По итогу у меня связь у таблиц один ко многим. Назовем родительской таблицу Location
+-- А дочерней Meeting для простоты. Соответсвенно дочерная таблица ссылается на родительскую и
+-- таких ссылок может быть от 1 до N.
+
+-- Для этой view нужно ввести ограничения для корректной работы
 
 CREATE VIEW CombinedView AS
 SELECT
     L.LocationId,
     L.Address,
     L.Name AS LocationName,
-    L.Description AS LocationDescription,
-    M.meetingId,
+    L.Description,
+    M.MeetingId,
     M.MeetingDate,
-    M.Location AS MeetingLocation,
     M.Agreement,
     M.FirstRatingStats,
     M.SecondRatingStats
 FROM
     Location L
-JOIN
-    Meeting M ON L.LocationId = M.Location;
+INNER JOIN
+    Meeting M ON L.LocationId = M.LocationId;
+
+SELECT * FROM CombinedView;
 
 DROP VIEW IF EXISTS CombinedView;
 
@@ -148,19 +176,43 @@ ON CombinedView
 INSTEAD OF INSERT
 AS
 BEGIN
+--  Ограничения вставки - мы не можем вставить в родительскую таблицу те записи, которые
+--  Уже есть в этой таблице, в этом нам помогает запрос WHERE NOT EXISTS
     INSERT INTO Location (LocationId, Address, Name, Description)
-    SELECT LocationId, Address, LocationName, LocationDescription FROM inserted;
+        SELECT DISTINCT I.LocationId, I.Address, I.LocationName, I.Description
+        FROM inserted AS I
+        WHERE NOT EXISTS (
+            SELECT L.LocationId
+            FROM Location AS L
+            WHERE I.LocationId = L.LocationId
+        );
 
-    INSERT INTO Meeting (meetingId, MeetingDate, Location, Agreement, FirstRatingStats, SecondRatingStats)
-    SELECT NEWID(), MeetingDate, LocationId, Agreement, FirstRatingStats, SecondRatingStats FROM inserted;
+    INSERT INTO Meeting (MeetingId, MeetingDate, LocationId, Agreement, FirstRatingStats, SecondRatingStats)
+        SELECT I.MeetingId, I.MeetingDate, L.LocationId, I.Agreement, I.FirstRatingStats, I.SecondRatingStats
+        FROM inserted as I
+            JOIN Location AS L
+            ON L.LocationId = I.LocationId
 END;
 
 DROP TRIGGER IF EXISTS trg_CombinedView_Insert;
 
-INSERT INTO CombinedView (LocationId, Address, LocationName, LocationDescription, MeetingDate, Agreement, FirstRatingStats, SecondRatingStats)
+-- Добавляем c новыми Location
+INSERT INTO CombinedView
+    (LocationId, Address, LocationName, Description,
+     MeetingId,  MeetingDate, Agreement, FirstRatingStats, SecondRatingStats)
 VALUES
-(NEWID(), '123 Main St', 'Conference Room A', 'Modern meeting space with audiovisual equipment', '2023-02-15', 1, 95, 88),
-(NEWID(), '456 Oak St', 'Board Room B', 'Classic board room for executive meetings', '2023-02-20', 1, 90, 85);
+    (4, '11 Main St', 'Conference Room A', 'first new',
+     7, '2023-02-16', 1, 4, 5),
+    (5, '50 Oaks St', 'Board Room B', 'second new',
+     8, '2023-02-18', 1, 5, 4);
+
+-- Добавляем c существующим Location - таблица Location не изменилась, ребенок добавился
+INSERT INTO CombinedView
+    (LocationId, Address, LocationName, Description,
+     MeetingId,  MeetingDate, Agreement, FirstRatingStats, SecondRatingStats)
+VALUES
+    (1, '123 Main St', 'Sample Location', 'This is a sample location',
+     9, '2023-02-11', 1, 3, 4);
 
 -- Обновление
 CREATE TRIGGER trg_CombinedView_Update
@@ -168,42 +220,94 @@ ON CombinedView
 INSTEAD OF UPDATE
 AS
 BEGIN
-    UPDATE L
-    SET Address = i.Address,
-        Name = i.LocationName,
-        Description = i.LocationDescription
-    FROM Location L
-    INNER JOIN inserted i ON L.LocationId = i.LocationId;
 
+    IF UPDATE(MeetingId)
+    BEGIN
+        THROW 50005, 'Can not update meeting id', 11;
+    END;
+
+    IF (UPDATE(LocationId)) OR (UPDATE(Address)) OR (UPDATE(LocationName)) OR (UPDATE(Description))
+    BEGIN
+        THROW 50004, 'Can not update location entity', 11;
+    END;
+
+    WITH InsertedLocation AS (
+        SELECT L.LocationId, I.MeetingId, I.MeetingDate, I.Agreement, I.FirstRatingStats, I.SecondRatingStats
+        FROM inserted AS I
+            INNER JOIN Location AS L
+            ON I.LocationId = L.LocationId
+    )
     UPDATE M
-    SET MeetingDate = i.MeetingDate,
-        Location = i.LocationId,
-        Agreement = i.Agreement,
-        FirstRatingStats = i.FirstRatingStats,
-        SecondRatingStats = i.SecondRatingStats
-    FROM Meeting M
-    INNER JOIN inserted i ON M.MeetingId = i.MeetingId;
+    SET MeetingDate = IL.MeetingDate,
+        Agreement = IL.Agreement,
+        FirstRatingStats = IL.FirstRatingStats,
+        SecondRatingStats = IL.SecondRatingStats
+    FROM Meeting AS M
+        INNER JOIN InsertedLocation AS IL
+        ON M.LocationId = IL.LocationId AND M.MeetingId = IL.MeetingId;
 END;
 
 DROP TRIGGER IF EXISTS trg_CombinedView_Update;
 
 UPDATE CombinedView
-SET LocationName = 'Updated Location', LocationDescription = 'Updated Description'
-WHERE LocationId = '1B831EC9-C3C2-4DF9-A0B1-3A9085CC9366';
+SET MeetingDate = '2025-11-15', Agreement = 0, FirstRatingStats = 1, SecondRatingStats = 1
+WHERE LocationId = 1;
 
+-- тест на просто обновление значений встреч по LocationId
+UPDATE CombinedView
+SET MeetingDate = '2025-11-15', Agreement = 0, FirstRatingStats = 1, SecondRatingStats = 1
+WHERE LocationId = 1;
 
--- Удаление
+-- тест на просто обновление значений встреч по атрибуту из meeting
+UPDATE CombinedView
+SET FirstRatingStats = 1
+WHERE SecondRatingStats = 5;
+
+-- тест на обновление meetingID - ошибка
+UPDATE CombinedView
+SET MeetingId = 1
+WHERE MeetingId = 2;
+
+-- тест на обновление чего-либо из Location - ошибка
+UPDATE CombinedView
+SET Address = 'fake address'
+WHERE LocationId = 1;
+
+-- Удаление - удаляю только детей
 CREATE TRIGGER trg_CombinedView_Delete
 ON CombinedView
 INSTEAD OF DELETE
 AS
 BEGIN
-    DELETE FROM Meeting WHERE Location IN (SELECT LocationId FROM deleted);
-    DELETE FROM Location WHERE LocationId IN (SELECT LocationId FROM deleted);
+    WITH DeletedLocation AS (
+        SELECT L.LocationId, D.MeetingId, D.Address, D.LocationName, D.Description
+        FROM deleted AS D
+            INNER JOIN Location AS L
+            ON D.LocationId = L.LocationId
+    )
+    DELETE FROM Meeting
+    WHERE EXISTS (
+        SELECT LocationId, Address, LocationName, Description FROM DeletedLocation AS DL
+        WHERE Meeting.LocationId = DL.LocationId AND Meeting.MeetingId = DL.MeetingId
+    );
 END;
 
 DROP TRIGGER IF EXISTS trg_CombinedView_Delete;
 
+-- тест на удаление по MeetingId
 DELETE FROM CombinedView
-WHERE LocationId = '1B831EC9-C3C2-4DF9-A0B1-3A9085CC9366';
+WHERE MeetingId = 1;
 
+-- тест на удаление по LocationId
+DELETE FROM CombinedView
+WHERE LocationId = 1;
+
+-- тест на удаление по атрибуту Meeting
+DELETE FROM CombinedView
+WHERE Agreement = 0;
+
+-- тест на удаление по атрибуту Location
+DELETE FROM CombinedView
+WHERE Address = '789 Pine St';
+
+-- Итого: встречи удаляются, локации нет
