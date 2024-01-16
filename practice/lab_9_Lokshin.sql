@@ -150,7 +150,7 @@ DROP TABLE IF EXISTS Meeting;
 
 -- Для этой view нужно ввести ограничения для корректной работы
 
-CREATE VIEW CombinedView AS
+CREATE VIEW LocationMeeting AS
 SELECT
     L.LocationId,
     L.Address,
@@ -166,13 +166,13 @@ FROM
 INNER JOIN
     Meeting M ON L.LocationId = M.LocationId;
 
-SELECT * FROM CombinedView;
+SELECT * FROM LocationMeeting;
 
-DROP VIEW IF EXISTS CombinedView;
+DROP VIEW IF EXISTS LocationMeeting;
 
 -- Вставка
-CREATE TRIGGER trg_CombinedView_Insert
-ON CombinedView
+CREATE TRIGGER trg_LocationMeeting_Insert
+ON LocationMeeting
 INSTEAD OF INSERT
 AS
 BEGIN
@@ -194,10 +194,10 @@ BEGIN
             ON L.LocationId = I.LocationId
 END;
 
-DROP TRIGGER IF EXISTS trg_CombinedView_Insert;
+DROP TRIGGER IF EXISTS trg_LocationMeeting_Insert;
 
 -- Добавляем c новыми Location
-INSERT INTO CombinedView
+INSERT INTO LocationMeeting
     (LocationId, Address, LocationName, Description,
      MeetingId,  MeetingDate, Agreement, FirstRatingStats, SecondRatingStats)
 VALUES
@@ -207,7 +207,7 @@ VALUES
      8, '2023-02-18', 1, 5, 4);
 
 -- Добавляем c существующим Location - таблица Location не изменилась, ребенок добавился
-INSERT INTO CombinedView
+INSERT INTO LocationMeeting
     (LocationId, Address, LocationName, Description,
      MeetingId,  MeetingDate, Agreement, FirstRatingStats, SecondRatingStats)
 VALUES
@@ -215,8 +215,8 @@ VALUES
      9, '2023-02-11', 1, 3, 4);
 
 -- Обновление
-CREATE TRIGGER trg_CombinedView_Update
-ON CombinedView
+CREATE TRIGGER trg_LocationMeeting_Update
+ON LocationMeeting
 INSTEAD OF UPDATE
 AS
 BEGIN
@@ -247,35 +247,35 @@ BEGIN
         ON M.LocationId = IL.LocationId AND M.MeetingId = IL.MeetingId;
 END;
 
-DROP TRIGGER IF EXISTS trg_CombinedView_Update;
+DROP TRIGGER IF EXISTS trg_LocationMeeting_Update;
 
-UPDATE CombinedView
+UPDATE LocationMeeting
 SET MeetingDate = '2025-11-15', Agreement = 0, FirstRatingStats = 1, SecondRatingStats = 1
 WHERE LocationId = 1;
 
 -- тест на просто обновление значений встреч по LocationId
-UPDATE CombinedView
+UPDATE LocationMeeting
 SET MeetingDate = '2025-11-15', Agreement = 0, FirstRatingStats = 1, SecondRatingStats = 1
 WHERE LocationId = 1;
 
 -- тест на просто обновление значений встреч по атрибуту из meeting
-UPDATE CombinedView
+UPDATE LocationMeeting
 SET FirstRatingStats = 1
 WHERE SecondRatingStats = 5;
 
 -- тест на обновление meetingID - ошибка
-UPDATE CombinedView
+UPDATE LocationMeeting
 SET MeetingId = 1
 WHERE MeetingId = 2;
 
 -- тест на обновление чего-либо из Location - ошибка
-UPDATE CombinedView
+UPDATE LocationMeeting
 SET Address = 'fake address'
 WHERE LocationId = 1;
 
 -- Удаление - удаляю только детей
-CREATE TRIGGER trg_CombinedView_Delete
-ON CombinedView
+CREATE TRIGGER trg_LocationMeeting_Delete
+ON LocationMeeting
 INSTEAD OF DELETE
 AS
 BEGIN
@@ -292,22 +292,22 @@ BEGIN
     );
 END;
 
-DROP TRIGGER IF EXISTS trg_CombinedView_Delete;
+DROP TRIGGER IF EXISTS trg_LocationMeeting_Delete;
 
 -- тест на удаление по MeetingId
-DELETE FROM CombinedView
+DELETE FROM LocationMeeting
 WHERE MeetingId = 1;
 
 -- тест на удаление по LocationId
-DELETE FROM CombinedView
+DELETE FROM LocationMeeting
 WHERE LocationId = 1;
 
 -- тест на удаление по атрибуту Meeting
-DELETE FROM CombinedView
+DELETE FROM LocationMeeting
 WHERE Agreement = 0;
 
 -- тест на удаление по атрибуту Location
-DELETE FROM CombinedView
+DELETE FROM LocationMeeting
 WHERE Address = '789 Pine St';
 
 -- Итого: встречи удаляются, локации нет
